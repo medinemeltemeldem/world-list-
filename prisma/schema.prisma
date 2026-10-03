@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  theme         String   @default("system")
+  locale        String   @default("tr")
+  notifications Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  words      Word[]
+  categories Category[]
+  tags       Tag[]
+  reviews    Review[]
+  quizzes    Quiz[]
+  sessions   LearningSession[]
+  sentences  UserSentence[]
+  dailyGoal  DailyGoal?
+  progress   UserProgress?
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  unit      String?
+  createdAt DateTime @default(now())
+  words     Word[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime  @default(now())
+  words     WordTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Word {
+  id              String         @id @default(cuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  englishWord     String
+  turkishMeaning  String
+  partOfSpeech    PartOfSpeech
+  level           Level
+  exampleSentence String?
+  turkishExample  String?
+  note            String?
+  status          LearningStatus @default(NEW)
+  isFavorite      Boolean        @default(false)
+  categoryId      String?
+  category        Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  learnedAt       DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  lastReviewedAt  DateTime?
+  nextReviewAt    DateTime?
+  reviewStep      Int            @default(0)
+  correctCount    Int            @default(0)
+  wrongCount      Int            @default(0)
+  reviewCount     Int            @default(0)
+  pronunciation   String?
+  ipa             String?
+  definition      String?
+  synonyms        String[]       @default([])
+  antonyms        String[]       @default([])
+  relatedWords    String[]       @default([])
+
+  tags          WordTag[]
+  reviews       Review[]
+  sentences     UserSentence[]
+  quizQuestions QuizQuestion[]
+
+  @@index([userId, createdAt])
+  @@index([userId, learnedAt])
+  @@index([userId, nextReviewAt])
+  @@index([userId, status])
+  @@index([userId, isFavorite])
+  @@index([userId, wrongCount])
+}
+
+model WordTag {
+  wordId String
+  tagId  String
+  word   Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([wordId, tagId])
+}
+
+model Review {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId     String
+  word       Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  correct    Boolean
+  source     ReviewSource @default(REVIEW)
+  reviewedAt DateTime     @default(now())
+
+  @@index([userId, reviewedAt])
+  @@index([wordId])
+}
+
+model Quiz {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          QuizType
+  questionCount Int
+  level         Level?
+  correctCount  Int            @default(0)
+  wrongCount    Int            @default(0)
+  startedAt     DateTime       @default(now())
+  finishedAt    DateTime?
+  questions     QuizQuestion[]
+
+  @@index([userId, startedAt])
+}
+
+model QuizQuestion {
+  id            String       @id @default(cuid())
+  quizId        String
+  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  wordId        String
+  word          Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  questionType  QuestionType
+  prompt        String
+  options       Json?
+  correctAnswer String
+  userAnswer    String?
+  isCorrect     Boolean?
+  answeredAt    DateTime?
+  position      Int
+
+  @@index([quizId, position])
+  @@index([wordId])
+}
+
+model UserSentence {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId    String
+  word      Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  sentence  String
+  createdAt DateTime @default(now())
+
+  @@index([wordId])
+  @@index([userId])
+}
+
+model UserProgress {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak     Int       @default(0)
+  longestStreak     Int       @default(0)
+  lastStudyDate     DateTime?
+  totalStudySeconds Int       @default(0)
+}
+
+model DailyGoal {
+  id            String @id @default(cuid())
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordsPerDay   Int    @default(10)
+  reviewsPerDay Int    @default(20)
+}
+
+model LearningSession {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      SessionType
+  duration  Int         @default(0)
+  itemCount Int         @default(0)
+  createdAt DateTime    @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum PartOfSpeech {
+  NOUN
+  VERB
+  ADJECTIVE
+  ADVERB
+  PREPOSITION
+  PHRASAL_VERB
+  EXPRESSION
+  OTHER
+}
+
+enum Level {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum LearningStatus {
+  NEW
+  LEARNING
+  REVIEW
+  LEARNED
+  DIFFICULT
+}
+
+enum QuizType {
+  EN_TO_TR
+  TR_TO_EN
+  MIXED
+  WRITTEN
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE_EN_TR
+  MULTIPLE_CHOICE_TR_EN
+  WRITTEN_EN
+  WRITTEN_TR
+  FILL_BLANK
+}
+
+enum ReviewSource {
+  REVIEW
+  QUIZ
+}
+
+enum SessionType {
+  REVIEW
+  QUIZ
+  STUDY
+}
